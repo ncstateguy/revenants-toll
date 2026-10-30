@@ -3,6 +3,7 @@
 A roguelite survival game in the style of Halls of Torment. Hold the halls against an endless horde, level up, loot gear, and slay the final boss before the halls collapse.
 
 **Play:** open the GitHub Pages link for this repo in a desktop browser. An Xbox controller is supported; keyboard works too.
+https://ncstateguy.github.io/revenants-toll/
 
 ## Controls
 - Move: left stick / WASD
