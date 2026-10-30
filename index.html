@@ -1668,7 +1668,7 @@ function normSave(){SAVE.runes=SAVE.runes||{};SAVE.codex=SAVE.codex||[];SAVE.tor
 function trimStash(){if(SAVE.stash.length>60){SAVE.stash.sort((a,b)=>itemPower(b)-itemPower(a));SAVE.stash.length=60}}
 const hasGear=()=>SAVE.stash.length>0||Object.values(SAVE.loadout).some(Boolean);
 const equippedCount=()=>SLOTS.filter(([s])=>SAVE.loadout[s]).length;
-const stashLine=()=>`Stash ${SAVE.stash.length} items · ${equippedCount()} equipped · ${cloudOK?'Saved to your Claude account':'Saved in this browser'}`;
+const stashLine=()=>`Stash ${SAVE.stash.length} items · ${equippedCount()} equipped · ${cloudOK?(window.CLOUD_LABEL||'Saved to your Claude account'):'Saved in this browser'}`;
 
 // ================== world: collapse, loot, shrines, portals, revenant ==================
 function genSarcs(){
@@ -2054,7 +2054,7 @@ function renderSelect(idx){
   const tierRow=runMode==='weekly'?'':`<div class="bar-row"><button class="pill" id="tierBtn">Torment: <b>${tierSel?'Tier '+tierSel:'Normal'}</b> · unlocked up to ${SAVE.torment.max?'Tier '+SAVE.torment.max:'Normal'}</button><span>${glyph('tier')} change</span></div>${tierSel?`<p class="padstat tiertext">${tierText(tierSel)}</p>`:SAVE.torment.max===0?'<p class="padstat">Slay the Tormentor to unlock Torment tiers.</p>':''}`;
   let weekly='';
   if(runMode==='weekly'){const muts=weeklyMuts();weekly=`<div class="weekly"><p class="lbl">${MAPS[weeklyMap()].name} · Torment ${WEEKLY_TIER}</p><p class="lbl">This week's mutators</p>${muts.map(id=>`<p><b>${WEEKLY[id].n}.</b> ${WEEKLY[id].t}</p>`).join('')}<p class="sub">Everyone gets the same map. You enter with no gear, so your stash is safe, and any loot you extract is yours to keep.</p>
-    <p class="lbl">Leaderboard</p>${BOARD.length?`<ol class="board">${BOARD.map(b=>`<li><span>${esc(nameOf(b.id))}</span><span>${CLASS_BY[b.cls]?CLASS_BY[b.cls].name:''}</span><b>${b.score}</b></li>`).join('')}</ol>`:`<p class="sub">${cloudOK?'No scores yet this week. Set the first one.':'Open this game on claude.ai to see the leaderboard.'}</p>`}</div>`}
+    <p class="lbl">Leaderboard</p>${BOARD.length?`<ol class="board">${BOARD.map(b=>`<li><span>${esc(nameOf(b.id))}</span><span>${CLASS_BY[b.cls]?CLASS_BY[b.cls].name:''}</span><b>${b.score}</b></li>`).join('')}</ol>`:`<p class="sub">${cloudOK?'No scores yet this week. Set the first one.':(window.CLOUD_HINT||'Open this game on claude.ai to see the leaderboard.')}</p>`}</div>`}
   overlay.innerHTML=`<section class="screen select"><header class="brand"><p class="eyebrow">Every death demands its toll</p><h1>Revenant's Toll</h1>
     <p class="lede">Hold the halls against an endless horde, grow your power with every level, and slay the Tormentor before the ceiling comes down.</p></header>
     <div class="pick"><div class="fams">${fams}</div><aside class="hdetail" id="hdetail"></aside></div>
@@ -2192,8 +2192,10 @@ window.__drawHero=drawHero;window.__game={startRun,update,render,chooseOption,ch
 loadLocal();
 renderSelect(0);
 requestAnimationFrame(frame);
+window.__initCloud=initCloud;
 initCloud();
 </script>
 
+<script type="module" src="cloud.js"></script>
 </body>
 </html>

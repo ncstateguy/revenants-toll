@@ -13,5 +13,10 @@ A roguelite survival game in the style of Halls of Torment. Hold the halls again
 ## Heroes
 Start as one of four basic heroes (Fighter, Apprentice, Scout, Wildling). Complete challenges to unlock their advanced forms. Your progress saves in your browser.
 
-## Testing notes
-This build runs entirely in your browser. Online features from the claude.ai version (weekly leaderboard, friends' Revenants and gifts) are turned off here.
+## Playing online
+On the hero select screen, choose **Sign in with Google** or **Play as guest** to join the weekly leaderboard, meet your friends' Revenants and receive gifts. Google sign-in keeps your progress on any computer. Guest progress stays in that browser, and a guest can link a Google account later without losing anything. You can also skip both and play offline.
+
+## For the maintainer
+- `index.html` is built from the game source with `./build.sh path/to/game.html`.
+- `cloud.js` and `cloud-adapter.js` connect the game to Firebase (project `revenant-s-toll`).
+- `firestore.rules` holds the database security rules. Paste them into Firebase > Firestore > Rules.

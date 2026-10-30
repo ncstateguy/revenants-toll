@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // Each player's private save
+    match /data/users/{uid}/save { allow read, write: if isMe(uid); }
+
+    // Shared, readable by any signed-in player; each player writes only their own
+    match /players/{uid}   { allow read: if signedIn(); allow write: if isMe(uid); }
+    match /revenants/{uid} { allow read: if signedIn(); allow write: if isMe(uid); }
+    match /scores/{uid}    { allow read: if signedIn(); allow write: if isMe(uid); }
+
+    // Gifts: anyone signed in can send one as themselves; only the recipient can read or claim it
+    match /gifts/{gid} {
+      allow create: if signedIn() && request.resource.data.from == request.auth.uid
+                    && request.resource.data.to is string && request.resource.size < 200000;
+      allow read, delete: if signedIn() && resource.data.to == request.auth.uid;
+    }
+  }
+}
