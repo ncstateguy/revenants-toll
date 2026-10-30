@@ -148,7 +148,7 @@ kbd{font-family:var(--f-body);font-weight:800;font-size:12px;border:1px solid va
 .cur{color:#c99bff;font-weight:700;margin:6px 0 0;font-size:14px}
 .note{color:#8fb6ff;font-size:12px;margin:6px 0 0}
 .cmp-h{margin:10px 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
-.cmp li.up{color:#7fd47a}.cmp li.dn{color:#e2606c}
+.cmp li.cu{color:#7fd47a}.cmp li.cd{color:#e2606c}
 .warn{color:#e2606c;font-weight:700;margin:8px 0 0}
 .tip.empty p{margin:0;color:var(--dim)}
 .forge-list{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;width:100%}
@@ -1621,7 +1621,7 @@ function diffLines(it,cur){const a=statMap(it),b=statMap(cur),ids=new Set([...Ob
 function compareHtml(it,cur){
   if(!cur)return `<p class="cmp-h">Slot is empty</p>`;
   const dl=diffLines(it,cur);
-  return `<p class="cmp-h">Versus equipped ${cur.name}</p><ul class="cmp">${dl.map(([id,d])=>`<li class="${d>0?'up':'dn'}">${d>0?'▲':'▼'} ${affText(id,d)}</li>`).join('')||'<li>No stat difference</li>'}${cur.leg&&cur.leg!==it.leg?`<li class="dn">▼ Lose ${LEG[cur.leg].name} power</li>`:''}${cur.curse&&!it.curse?'<li class="up">▲ Lose curse</li>':''}${it.curse&&!cur.curse?'<li class="dn">▼ Gain curse</li>':''}</ul>`;
+  return `<p class="cmp-h">Versus equipped ${cur.name}</p><ul class="cmp">${dl.map(([id,d])=>`<li class="${d>0?'cu':'cd'}">${d>0?'▲':'▼'} ${affText(id,d)}</li>`).join('')||'<li>No stat difference</li>'}${cur.leg&&cur.leg!==it.leg?`<li class="cd">▼ Lose ${LEG[cur.leg].name} power</li>`:''}${cur.curse&&!it.curse?'<li class="cu">▲ Lose curse</li>':''}${it.curse&&!cur.curse?'<li class="cd">▼ Gain curse</li>':''}</ul>`;
 }
 function itemTip(it,cmp,opts){
   if(!it)return `<div class="tip empty"><p>${opts&&opts.emptyText||'Empty slot'}</p></div>`;
@@ -1764,7 +1764,7 @@ function drawThrone(c,t,onScr){
 function drawWorldObjects(c,t,onScr){
   for(const s of sarcs){if(!onScr(s.x,s.y,40))continue;c.save();c.translate(s.x,s.y);c.rotate(s.a);c.fillStyle='rgba(0,0,0,.4)';c.fillRect(-18,-8,44,26);c.fillStyle='#3a3238';c.fillRect(-22,-13,44,26);
     if(s.open){c.fillStyle='#0c0a0e';c.fillRect(-18,-9,36,18);c.save();c.translate(12,-18);c.rotate(0.35);c.fillStyle='#4a4148';c.fillRect(-22,-6,44,12);c.restore()}
-    else{c.fillStyle='#4a4148';c.fillRect(-22,-13,44,8);c.globalAlpha=0.45+0.3*Math.sin(t*3+s.x);c.fillStyle='#e3bd5d';c.fillRect(-2,-10,4,18);c.fillRect(-7,-5,14,3);c.globalAlpha=1}
+    else{c.fillStyle='#4a4148';c.fillRect(-22,-13,44,8);c.fillStyle='#2a2329';c.fillRect(-15,-13,4,26);c.fillRect(11,-13,4,26);c.globalAlpha=0.45+0.3*Math.sin(t*3+s.x);c.fillStyle='#e3bd5d';c.beginPath();c.moveTo(0,-8);c.lineTo(6,0);c.lineTo(0,8);c.lineTo(-6,0);c.closePath();c.fill();c.fillStyle='#3a3238';c.beginPath();c.moveTo(0,-3.5);c.lineTo(2.6,0);c.lineTo(0,3.5);c.lineTo(-2.6,0);c.closePath();c.fill();c.globalAlpha=1}
     c.restore()}
   for(const s of shrines){if(!onScr(s.x,s.y,70))continue;const k=Math.min(1,s.life/10);c.globalAlpha=k;c.fillStyle='rgba(0,0,0,.45)';ell(c,s.x,s.y+14,30,10);c.fillStyle='#2b2530';c.fillRect(s.x-24,s.y-6,48,20);c.fillStyle='#3d3442';c.fillRect(s.x-18,s.y-18,36,14);
     c.fillStyle=`rgba(143,208,255,${0.6+0.3*Math.sin(t*4)})`;c.fillRect(s.x-12,s.y-14,24,4);c.strokeStyle='rgba(143,208,255,.45)';c.lineWidth=2;c.beginPath();c.arc(s.x,s.y,34,0,TAU);c.stroke();
