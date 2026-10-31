@@ -275,8 +275,94 @@ function sfx(n){
   if(!AC||muted)return; const s=SFX[n]; const t=AC.currentTime;
   if(sfxLast[n]&&t-sfxLast[n]<s.gap)return; sfxLast[n]=t;
   try{const o=AC.createOscillator(),g=AC.createGain();o.type=s.t;o.frequency.setValueAtTime(s.f0,t);o.frequency.exponentialRampToValueAtTime(s.f1,t+s.d);
-  g.gain.setValueAtTime(s.v,t);g.gain.exponentialRampToValueAtTime(0.0008,t+s.d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+s.d+.02)}catch(e){}
+  g.gain.setValueAtTime(s.v,t);g.gain.exponentialRampToValueAtTime(0.0008,t+s.d);o.connect(g);g.connect(audioBus()?BUS.fx:AC.destination);o.start(t);o.stop(t+s.d+.02)}catch(e){}
 }
+// ================== music (generated live, adapts to the run) ==================
+const AUD_KEY='revenantsToll.audio';
+let VOL={m:0.6,s:1};try{const o=JSON.parse(localStorage.getItem(AUD_KEY)||'null');if(o&&isFinite(o.m)&&isFinite(o.s))VOL={m:+o.m,s:+o.s}}catch(e){}
+const saveVol=()=>{try{localStorage.setItem(AUD_KEY,JSON.stringify(VOL))}catch(e){}};
+const pct=v=>Math.round(v*100)+'%';
+let BUS=null;
+function audioBus(){
+  if(!AC)return null;if(BUS)return BUS;
+  try{
+    const master=AC.createGain(),music=AC.createGain(),fx=AC.createGain(),duck=AC.createGain(),lp=AC.createBiquadFilter(),rev=AC.createConvolver(),revG=AC.createGain(),dry=AC.createGain();
+    lp.type='lowpass';lp.frequency.value=18000;
+    const len=Math.floor(AC.sampleRate*2.6),ib=AC.createBuffer(2,len,AC.sampleRate);
+    for(let ch=0;ch<2;ch++){const d=ib.getChannelData(ch);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6)}
+    rev.buffer=ib;revG.gain.value=0.4;
+    dry.connect(duck);dry.connect(rev);rev.connect(revG);revG.connect(duck);duck.connect(lp);lp.connect(music);music.connect(master);fx.connect(master);master.connect(AC.destination);
+    const nb=AC.createBuffer(1,AC.sampleRate,AC.sampleRate),nd=nb.getChannelData(0);for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
+    BUS={master,music,fx,duck,lp,in:dry,noise:nb};applyVol();
+  }catch(e){BUS=null}
+  return BUS;
+}
+function applyVol(){if(!BUS)return;const t=AC.currentTime;BUS.master.gain.setTargetAtTime(muted?0:1,t,0.05);BUS.music.gain.setTargetAtTime(VOL.m*1.4,t,0.15);BUS.fx.gain.setTargetAtTime(VOL.s,t,0.05)}
+const hz=(r,st)=>r*Math.pow(2,st/12);
+function mtone(type,f,t,dur,vol,o){
+  o=o||NO;const os=AC.createOscillator(),g=AC.createGain();os.type=type;os.frequency.setValueAtTime(f,t);
+  if(o.f1)os.frequency.exponentialRampToValueAtTime(o.f1,t+(o.sweep||dur));if(o.det)os.detune.value=o.det;
+  const a=o.a||0.008;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+Math.max(a+0.02,dur));
+  let out=g;if(o.lp){const fl=AC.createBiquadFilter();fl.type='lowpass';fl.frequency.value=o.lp;g.connect(fl);out=fl}
+  os.connect(g);out.connect(o.dry?BUS.duck:BUS.in);os.start(t);os.stop(t+dur+0.05);
+}
+function mnoise(t,dur,vol,ftype,freq,q){
+  const sr=AC.createBufferSource(),g=AC.createGain(),fl=AC.createBiquadFilter();sr.buffer=BUS.noise;fl.type=ftype;fl.frequency.value=freq;fl.Q.value=q||1;
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);sr.connect(fl);fl.connect(g);g.connect(BUS.in);sr.start(t,Math.random()*0.5);sr.stop(t+dur+0.05);
+}
+// Ashen Crypt: D minor, organ and ember crackle. Sunken Ossuary: C# minor (dorian lean), glassy tones and dripping water.
+const MSCALE={
+  crypt:{root:73.42,prog:[[0,3,7],[-4,0,3],[5,8,12],[7,10,14]],mel:[0,3,5,7,10,12,15],kind:'crypt'},
+  ossuary:{root:69.3,prog:[[0,3,7],[-2,2,5],[-4,0,3],[-2,2,5]],mel:[0,2,3,7,9,12,14],kind:'water'},
+};
+const MUS={drone:null,next:0,step:0,int:0};
+function droneInit(){
+  const d={f:AC.createBiquadFilter(),g:AC.createGain(),o:[]};d.f.type='lowpass';d.f.frequency.value=200;d.f.Q.value=3;d.g.gain.value=0;
+  for(const [ty,mul,det] of [['sawtooth',1,-8],['sawtooth',1,8],['sine',0.5,0],['triangle',1.5,4]]){const o=AC.createOscillator();o.type=ty;o.detune.value=det;o.mul=mul;o.frequency.value=73.42*mul;o.connect(d.f);o.start();d.o.push(o)}
+  const lfo=AC.createOscillator(),lg=AC.createGain();lfo.frequency.value=0.06;lg.gain.value=80;lfo.connect(lg);lg.connect(d.f.frequency);lfo.start();
+  d.f.connect(d.g);d.g.connect(BUS.in);return d;
+}
+const PLAY_STATES=new Set(['play','levelup','chest','pause','inspect','forge','extract','merchant','anchor']);
+function musicTick(){
+  if(!AC||AC.state!=='running'||!audioBus())return;
+  if(!MUS.drone){MUS.drone=droneInit();MUS.next=AC.currentTime+0.15}
+  const playing=!!P&&PLAY_STATES.has(state),S=MSCALE[playing?MAP.id:'crypt']||MSCALE.crypt;
+  let it=0,bossOn=false,collapse=false;
+  if(playing){it=clamp(dirT/780,0,1)*0.55+clamp(enemies.length/220,0,1)*0.45;bossOn=!!(boss&&!boss.dead);collapse=!P.won&&(dirT>690||!inZone(P.x,P.y,0));if(bossOn)it=Math.max(it,0.75)}
+  MUS.int+=(it-MUS.int)*0.02;const I=MUS.int,t=AC.currentTime,paused=playing&&state!=='play';
+  BUS.duck.gain.setTargetAtTime(paused?0.45:1,t,0.3);BUS.lp.frequency.setTargetAtTime(paused?650:18000,t,0.35);
+  const D=MUS.drone;D.o.forEach(o=>o.frequency.setTargetAtTime(S.root*o.mul,t,0.6));
+  D.f.frequency.setTargetAtTime(140+I*620+(bossOn?320:0),t,0.5);D.g.gain.setTargetAtTime(playing?0.07:0.05,t,0.8);
+  const bpm=playing?62+I*34+(bossOn?10:0)+(collapse?16:0):54,e=60/bpm/2;
+  if(MUS.next<t-0.25)MUS.next=t+0.05;
+  while(MUS.next<t+0.3){musicStep(MUS.next,MUS.step,e,S,I,playing,bossOn,collapse);MUS.next+=e;MUS.step++}
+}
+function musicStep(t,st,e,S,I,playing,bossOn,collapse){
+  const b=st%8,R=S.root,chord=S.prog[Math.floor(st/16)%4];
+  // chord pad every two bars
+  if(st%16===0){const dur=e*16*1.08;for(const n of chord){
+    if(S.kind==='crypt'){mtone('triangle',hz(R*2,n),t,dur,0.03,{a:1.4,lp:1400});mtone('square',hz(R*4,n),t,dur,0.006,{a:1.8,lp:900})}
+    else{mtone('sine',hz(R*2,n),t,dur,0.034,{a:1.6,det:6});mtone('sine',hz(R*4,n),t,dur,0.012,{a:2,det:-6})}}}
+  if(playing){
+    // heartbeat
+    if(I>0.2&&(b===0||b===1)){const v=0.22*Math.min(1,(I-0.2)*2.2)*(b===0?1:0.6);mtone('sine',95,t,0.35,v,{f1:42,sweep:0.25,dry:true})}
+    // war drums
+    if(I>0.48&&(b===2||b===6||(I>0.72&&b===7)))mtone('sine',150,t,0.26,0.13,{f1:68,sweep:0.2,dry:true});
+    if(I>0.6&&b===4)mnoise(t,0.16,0.05,'bandpass',1900,0.8);
+    // boss ostinato
+    if(bossOn){const f=(b===3||b===7)?hz(R,7):(b===5?hz(R,3):R);mtone('sawtooth',f,t,e*0.9,0.05,{lp:520})}
+    // collapse: urgent tremolo strings
+    if(collapse&&b%2===0)mtone('sawtooth',hz(R*8,chord[(b>>1)%3]),t,e*0.95,0.011,{a:0.02,lp:2600});
+  }
+  // sparse melody
+  if(b%2===0&&Math.random()<(playing?0.1+I*0.16:0.08)){const n=S.mel[Math.floor(Math.random()*S.mel.length)],f=hz(R*8,n);
+    if(S.kind==='crypt'){mtone('sine',f,t,1.7,0.028);mtone('triangle',f*2,t,0.7,0.006)}
+    else mtone('sine',f*1.5,t,0.3,0.028,{f1:f*0.92,sweep:0.3})}
+  // ambience
+  if(S.kind==='crypt'){if(Math.random()<0.35)mnoise(t+Math.random()*e,0.02,0.02,'highpass',5200,0.7)}
+  else if(Math.random()<0.14)mtone('sine',1300+Math.random()*900,t+Math.random()*e,0.14,0.02,{f1:480,sweep:0.12});
+}
+addEventListener('pointerdown',()=>unlockAudio());addEventListener('keydown',()=>unlockAudio());
 function rumble(strong,weak,ms){ const p=getPad(); if(!p||!p.vibrationActuator)return; try{const r=p.vibrationActuator.playEffect('dual-rumble',{duration:ms,strongMagnitude:strong,weakMagnitude:weak}); if(r&&r.catch)r.catch(()=>{})}catch(e){} }
 
 // ================== input ==================
@@ -1257,7 +1343,7 @@ function renderPause(idx){
   const eq=SLOTS.map(([s,n])=>`<button class="opt slot${P.gear[s]?'':' empty'}" data-k="E:${s}">${itemMini(P.gear[s],n)}</button>`).join('');
   const sat=[0,1,2,3,4,5].map(i=>{const it=P.satchel[i];return it?`<button class="opt slot" data-k="B:${i}">${itemMini(it)}</button>`:`<div class="slot empty dead"><span class="mini-name empty">Empty</span><span class="mini-meta">Satchel</span></div>`}).join('');
   overlay.innerHTML=`<section class="screen big"><h2>Paused</h2><p class="sub">${P.cls.name} · Level ${P.level} · ${fmtTime(dirT)} · ${kills} slain · ${P.ash} Ash</p>
-    <div class="menu-list row"><button class="opt mbtn" data-k="resume">Resume</button><button class="opt mbtn" data-k="sound">Sound: ${muted?'Off':'On'}</button><button class="opt mbtn" data-k="quit">Abandon run</button></div>
+    <div class="menu-list row"><button class="opt mbtn" data-k="resume">Resume</button><button class="opt mbtn" data-k="music">Music: ${muted?'Muted':pct(VOL.m)}</button><button class="opt mbtn" data-k="effects">Effects: ${muted?'Muted':pct(VOL.s)}</button><button class="opt mbtn" data-k="quit">Abandon run</button></div>
     <div class="arm"><div class="col"><h4 class="lbl">Equipped</h4><div class="grid">${eq}</div><h4 class="lbl">Satchel · ${P.satchel.length} of 6</h4><div class="grid">${sat}</div></div><aside class="detail" id="detail"></aside></div>
     ${buildHtml()}${hints([['nav','Move'],['confirm','Select'],['reroll','Salvage'],['back','Resume']])}
     <p class="sub" style="font-size:13px">${glyph('move')} move · ${glyph('aim')} aim (otherwise auto-aim) · ${glyph('ult')} ${lastDevice==='pad'?'or RT ':''}ultimate · ${glyph('dodge')} dodge · near loot: ${glyph('equip')} inspect, ${glyph('stow')} stow, ${glyph('salvage')} salvage</p></section>`;
@@ -1268,7 +1354,7 @@ function pauseAct(i,b){
   const el=menu.items[i];if(!el)return;const k=el.dataset.k,[t,v]=k.split(':');
   if(b==='a'){
     if(k==='resume')return resume();
-    if(k==='sound'){muted=!muted;return renderPause(i)}
+    if(k==='music'||k==='effects'){const key=k==='music'?'m':'s';if(muted)muted=false;else VOL[key]=VOL[key]>=0.99?0:Math.round((VOL[key]+0.2)*10)/10;saveVol();applyVol();if(k==='effects')sfx('select');return renderPause(i)}
     if(k==='quit'){if(menuCtx!=='quit'){pauseDetail(i,true);menuCtx='quit';return}menuCtx=null;hideOverlay();state='play';endRun('dead','You abandoned the vigil.');return}
     if(t==='E'){const it=P.gear[v];if(it&&P.satchel.length<6){applyItem(it,-1);delete P.gear[v];P.satchel.push(it);renderPause(i)}}
     if(t==='B'){const it=P.satchel[+v],old=P.gear[it.slot];applyItem(old,-1);P.gear[it.slot]=it;applyItem(it,1);P.satchel.splice(+v,1);if(old)P.satchel.splice(+v,0,old);renderPause(i)}
@@ -1280,6 +1366,7 @@ function pauseDetail(i,confirm){
   if(t==='E')d.innerHTML=itemTip(P.gear[v],undefined,{emptyText:'Nothing equipped in this slot.'});
   else if(t==='B'){const it=P.satchel[+v];d.innerHTML=itemTip(it,P.gear[it.slot]||null)+`<p class="note">${glyph('reroll')} salvages it for ${salvageValue(it)} Ash.</p>`}
   else if(k==='quit')d.innerHTML=`<div class="tip plain"><h4>Abandon run</h4><p class="${confirm?'warn':'meta'}">${confirm?'Press '+glyph('confirm')+' again to confirm. Abandoning counts as a death: all carried gear is lost.':'Abandoning counts as a death. All carried gear is lost.'}</p></div>`;
+  else if(k==='music'||k==='effects')d.innerHTML=`<div class="tip plain"><h4>${k==='music'?'Music':'Sound effects'}</h4><p class="meta">Press ${glyph('confirm')} to step the volume up by 20%. After 100% it wraps to off.</p></div>`;
   else d.innerHTML=`<div class="tip plain"><h4>${P.ash} Ash</h4><p class="meta">Salvage loot for Ash, then spend it at Forge Shrines.</p></div>`;
 }
 function resume(){state='play';hideOverlay()}
@@ -2178,7 +2265,8 @@ let lastT=performance.now();
 function frame(now){
   const dt=Math.min(0.05,Math.max(0,(now-lastT)/1000));lastT=now;
   pollInput(dt);
-  if(inp.pressed.mute&&state!=='pause'){muted=!muted;if(state==='select')renderSelect(menu?menu.idx:selClass)}
+  try{musicTick()}catch(e){}
+  if(inp.pressed.mute&&state!=='pause'){muted=!muted;applyVol();if(state==='select')renderSelect(menu?menu.idx:selClass)}
   if(state==='play'){
     if(inp.pressed.pause)openPause();
     else{if(inp.pressed.dev)dirT+=60;lootInput(dt);if(state==='play')update(dt)}
